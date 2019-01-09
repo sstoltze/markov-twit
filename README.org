@@ -1,0 +1,5 @@
+* markov-twit
+
+A small project using Markov chains and the Twitter api to generate tweets in the style of a particular user.
+
+For now, it does nearly nothing. The code is adapted/blatantly copied from [[http://howistart.org/posts/clojure/1/]].
