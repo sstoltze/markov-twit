@@ -33,7 +33,8 @@
   ([text]
    (text->word-chain text 2))
   ([text n]
-   (let [words (filter not-empty (clojure.string/split text #"[\s|\n]"))
+   (let [words (filter not-empty
+                       (clojure.string/split text #"[\s|\n]"))
          transitions (partition-all (+ n 1) 1 words)]
      (word-chain transitions))))
 
@@ -54,7 +55,7 @@
 
 (defn generate-text
   ([chain]
-   (generate-text chain (word-list->text (first (first chain)))))
+   (generate-text chain (word-list->text (first (first (shuffle (filter first chain)))))))
   ([chain start-phrase]
    (generate-text chain start-phrase 280))
   ([chain start-phrase max-length]
@@ -70,23 +71,30 @@
 (defn clean-text [text]
   (let [trimmed (if (re-find #"[.,!?]" text)
                   (apply str (re-seq #"[\s\w]+[^.!?,]*[.!?,]" text)) ; Trim to last punctuation
-                  (apply str (re-seq #".*[^a-zA-Z]+" text))) ; Trim last word
-        cleaned (clojure.string/replace trimmed #"[,| ]$" ".")]
+                  (apply str (re-seq #".*[^a-zA-Z]+" text)))         ; Trim last word
+        strip-link (clojure.string/replace trimmed #" https://.*\.$" "")
+        cleaned (clojure.string/replace strip-link #"[,| |:]$" ".")]
     (clojure.string/replace cleaned #"\"" "'")))
 
 ;; Max 200 tweets returned by Twitter api
 (defn tweets [user]
-  (->> (twitter/statuses-user-timeline :oauth-creds credentials :params {:screen-name user :count 200})
+  (->> (twitter/statuses-user-timeline :oauth-creds credentials
+                                       :params {:screen-name user :count 200})
        :body
        (map :text)
-       (map clojure.string/lower-case))
-  ;(map clojure.string/lower-case (map :text (:body (twitter/statuses-user-timeline :oauth-creds credentials :params {:screen-name user :count 200}))))
-  )
+       ;(map clojure.string/lower-case)
+       ))
 
-(defn list->chain [list]
+(defn list->word-chain [list]
   (apply merge-with clojure.set/union (map text->word-chain list)))
 
-(defn generate-tweet [user]
-  (generate-text (list->chain (tweets user))))
-;; To process several files:
-;; (apply merge-with clojure.set/union (map file->word-chain files))
+(defn generate-tweet
+  ([user]
+   (generate-tweet user 1))
+  ([user n]
+   (map clean-text
+        (map generate-text
+             (repeat n (list->word-chain (tweets user)))))))
+
+(defn -main []
+  (generate-tweet "NorthernlionLP" 5))
