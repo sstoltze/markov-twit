@@ -1,5 +1,4 @@
-;; Markov chains: http://howistart.org/posts/clojure/1/
-;; Twitter:
+;; Markov chains and getting started with Twitter: http://howistart.org/posts/clojure/1/
 (ns markov-twit.generator
   (:gen-class)
   (:require
@@ -21,9 +20,6 @@
                           r
                           {(cond
                              (< (count t) n) #{}
-                             ;; (concat (butlast t)
-                             ;;                         (take (- n (count t))
-                             ;;                               (repeat nil)))
                              :else (butlast t))
                            #{(last t)}}))
             {}
@@ -59,7 +55,9 @@
   ([chain start-phrase]
    (generate-text chain start-phrase 280))
   ([chain start-phrase max-length]
-   (let [prefix (clojure.string/split start-phrase #" ")]
+   (let [prefix (if (string? start-phrase)
+                  (clojure.string/split start-phrase #" ")
+                  start-phrase)]
      (word-list->text (walk-chain chain prefix prefix max-length)))))
 
 (defn file->word-chain
@@ -76,13 +74,13 @@
         cleaned (clojure.string/replace strip-link #"[,| |:]$" ".")]
     (clojure.string/replace cleaned #"\"" "'")))
 
-;; Max 200 tweets returned by Twitter api
 (defn tweets [user]
   (->> (twitter/statuses-user-timeline :oauth-creds credentials
+                                       ;; Max 200 tweets returned by Twitter api
                                        :params {:screen-name user :count 200})
        :body
        (map :text)
-       ;(map clojure.string/lower-case)
+       ;; (map clojure.string/lower-case)
        ))
 
 (defn list->word-chain [list]
@@ -92,9 +90,15 @@
   ([user]
    (generate-tweet user 1))
   ([user n]
-   (map clean-text
-        (map generate-text
-             (repeat n (list->word-chain (tweets user)))))))
-
-(defn -main []
-  (generate-tweet "NorthernlionLP" 5))
+   (let [tweets (tweets user)]
+     (map (comp clean-text
+                generate-text)
+          ;; Tweets
+          (repeat n (list->word-chain tweets))
+          ;; Starting phrases
+          (take n
+                (shuffle
+                 (map (fn [x]
+                        (take 2
+                              (clojure.string/split x #" ")))
+                      tweets)))))))
