@@ -118,3 +118,15 @@
                    (client/get (str "https://reddit.com/user/" user ".json?limit=100")
                                {:as :json
                                 :headers http-header}))))))))
+
+(defn get-subreddit-titles
+  ([subreddit]
+   (filter not-empty
+           ;; Other options: :selftext
+           (map (comp :title :data)
+                (:children
+                 (:data
+                  (:body
+                   (client/get (str "https://reddit.com/r/" subreddit ".json?limit=100")
+                               {:as :json
+                                :headers http-header}))))))))
