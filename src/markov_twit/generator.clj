@@ -2,11 +2,16 @@
 (ns markov-twit.generator
   (:gen-class)
   (:require
-   [twitter.api.restful :as twitter]
+   [clj-http.client :as client]
+   [cheshire.core :as cheshire]
+   [environ.core :refer [env]]
    [twitter.oauth :as twitter-oauth]
-   [environ.core :refer [env]]))
+   [twitter.api.restful :as twitter]
+   ))
 
 (def example "And the Golden Grouse And the Pobble who")
+
+(def http-header {"User-Agent" "markov-twit clj-http.client/3.9.1"})
 
 (def credentials (twitter-oauth/make-oauth-creds (env :app-consumer-key)
                                                  (env :app-consumer-secret)
@@ -102,3 +107,14 @@
                         (take 2
                               (clojure.string/split x #" ")))
                       tweets)))))))
+
+(defn get-reddit-comments
+  ([user]
+   (filter not-empty
+           (map (comp :body :data)
+                (:children
+                 (:data
+                  (:body
+                   (client/get (str "https://reddit.com/user/" user ".json?limit=100")
+                               {:as :json
+                                :headers http-header}))))))))
