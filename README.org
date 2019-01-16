@@ -1,13 +1,23 @@
 * markov-twit
-A small project using Markov chains and the Twitter api to generate tweets in the style of a particular user. The code is based on and adapted from [[http://howistart.org/posts/clojure/1/]].
 
-Usage:
+** Description
+A small project using Markov chains and the Twitter and Reddit api to generate tweets and Reddit comments in the style of a particular user, or posts and titles for a given subreddit. The code is based on [[http://howistart.org/posts/clojure/1/]].
+
+** Usage
 #+BEGIN_SRC clojure
 (generate-tweet "TwitterUser" 10)
 #+END_SRC
 Pulls the 200 most recent tweets from the timeline of @TwitterUser, creates a Markov chain and walks the chain 10 times to generate new tweets, starting each time from the beginning of a random tweet.
 
-It was created using [[https://leiningen.org/][Leiningen]]. To get it to work, you need a =profiles.clj= file in the project root directory, containing the following:
+#+BEGIN_SRC clojure
+(generate-reddit-comment "RedditUser" 10)
+(generate-reddit-title "Subreddit" 10)
+(generate-reddit-post "Subreddit" 10)
+#+END_SRC
+Exactly the same, except they use the Reddit API to pull 200 comments, titles or posts respectively to generate the Markov chain.
+
+** Setup
+The project was created using [[https://leiningen.org/][Leiningen]]. To get Twitter integration to work, you need a =profiles.clj= file in the project root directory, containing the following:
 #+BEGIN_SRC clojure
 {:dev  {:env {:app-consumer-key "twitter-key"
               :app-consumer-secret "twitter-secret"

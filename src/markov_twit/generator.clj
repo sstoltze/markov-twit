@@ -2,14 +2,11 @@
 (ns markov-twit.generator
   (:gen-class)
   (:require
-   [clj-http.client :as client]
    [cheshire.core :as cheshire]
+   [clj-http.client :as client]
    [environ.core :refer [env]]
-   [twitter.oauth :as twitter-oauth]
    [twitter.api.restful :as twitter]
-   ))
-
-(def example "And the Golden Grouse And the Pobble who")
+   [twitter.oauth :as twitter-oauth]))
 
 (def http-header {"User-Agent" "markov-twit clj-http.client/3.9.1"})
 
@@ -79,6 +76,9 @@
         cleaned (clojure.string/replace strip-link #"[,| |:]$" ".")]
     (clojure.string/replace cleaned #"\"" "'")))
 
+(defn list->word-chain [list]
+  (apply merge-with clojure.set/union (map text->word-chain list)))
+
 (defn tweets [user]
   (->> (twitter/statuses-user-timeline :oauth-creds credentials
                                        ;; Max 200 tweets returned by Twitter api
@@ -88,45 +88,84 @@
        ;; (map clojure.string/lower-case)
        ))
 
-(defn list->word-chain [list]
-  (apply merge-with clojure.set/union (map text->word-chain list)))
+(defn- get-reddit-helper [param key size user after result]
+  (let [url (str "https://reddit.com/"
+                 (if user
+                   "u/"
+                   "r/")
+                 param
+                 ".json?limit=100&after="
+                 after)
+        info (:data
+              (:body
+               (client/get url
+                           {:as :json
+                            :headers http-header})))
+        children (filter not-empty
+                         (map (comp key :data)
+                              (:children info)))
+        new-after (:after info)
+        n (count children)]
+    (if (or (<= size n)
+            (empty? new-after)
+            (= new-after after))
+      (concat result (take size children))
+      (recur param key (- size n) user new-after (concat result children)))))
+
+(defn get-reddit-info
+  "Key-options:
+    For subreddit - :title, :selftext
+    For user - :body
+    For other options, consult the Reddit API."
+  ([param key & {:keys [size user after]}]
+   (get-reddit-helper param key (or size 200) user after [])))
+
+(defn get-reddit-comments
+  ([user & [n]]
+   (get-reddit-info user :body :user true :size n)))
+
+(defn get-reddit-titles
+  ([subreddit & [n]]
+   (get-reddit-info subreddit :title :size n)))
+
+(defn get-reddit-posts
+  ([subreddit & [n]]
+   (get-reddit-info subreddit :selftext :size n)))
+
+(defn generate-and-run-chain
+  ([input-list n]
+   (map (comp clean-text
+              generate-text)
+        ;; n copies of the generated chain
+        (repeat n (list->word-chain input-list))
+        ;; n starting phrases
+        (take n
+              (shuffle
+               (map (fn [x]
+                      (take 2
+                            (clojure.string/split x #" ")))
+                    input-list))))))
 
 (defn generate-tweet
   ([user]
    (generate-tweet user 1))
   ([user n]
-   (let [tweets (tweets user)]
-     (map (comp clean-text
-                generate-text)
-          ;; Tweets
-          (repeat n (list->word-chain tweets))
-          ;; Starting phrases
-          (take n
-                (shuffle
-                 (map (fn [x]
-                        (take 2
-                              (clojure.string/split x #" ")))
-                      tweets)))))))
+   (generate-and-run-chain (tweets user) n)))
 
-(defn get-reddit-comments
+(defn generate-reddit-comment
   ([user]
-   (filter not-empty
-           (map (comp :body :data)
-                (:children
-                 (:data
-                  (:body
-                   (client/get (str "https://reddit.com/user/" user ".json?limit=100")
-                               {:as :json
-                                :headers http-header}))))))))
+   (generate-reddit-comment user 1))
+  ([user n]
+   (generate-and-run-chain (get-reddit-comments user) n)))
 
-(defn get-subreddit-titles
+(defn generate-reddit-post
   ([subreddit]
-   (filter not-empty
-           ;; Other options: :selftext
-           (map (comp :title :data)
-                (:children
-                 (:data
-                  (:body
-                   (client/get (str "https://reddit.com/r/" subreddit ".json?limit=100")
-                               {:as :json
-                                :headers http-header}))))))))
+   (generate-reddit-post subreddit 1))
+  ([subreddit n]
+   (generate-and-run-chain (get-reddit-posts subreddit) n)))
+
+(defn generate-reddit-title
+  ([subreddit]
+   (generate-reddit-title subreddit 1))
+  ([subreddit n]
+   (generate-and-run-chain (get-reddit-titles subreddit) n)))
