@@ -146,33 +146,31 @@
                             (clojure.string/split x #" ")))
                     input-list))))))
 
-(defn generate-tweet
+(defn generate-tweet-orig
   ([user]
-   (generate-tweet user 1))
+   (generate-tweet-orig user 1))
   ([user n]
    (generate-and-run-chain (tweets user) n)))
 
-(defn generate-reddit-comment
-  ([user]
-   (generate-reddit-comment user 1))
-  ([user n]
-   (generate-and-run-chain (get-reddit-comments user) n)))
+(defmacro def-markov-function [name func & {:keys [doc-string]}]
+  "name is the name of the function to be defined, func should accept a single parameter
+and return a list of texts used for generating the markov chain."
+  (concat `(defn ~name)
+          (when doc-string `(~doc-string))
+          `(([param#]
+             (~name param# 1))
+            ([param# n#]
+             (generate-and-run-chain (~func param#) n#)))))
 
-(defn generate-reddit-post
-  ([subreddit]
-   (generate-reddit-post subreddit 1))
-  ([subreddit n]
-   (generate-and-run-chain (get-reddit-posts subreddit) n)))
-
-(defn generate-reddit-title
-  ([subreddit]
-   (generate-reddit-title subreddit 1))
-  ([subreddit n]
-   (generate-and-run-chain (get-reddit-titles subreddit) n)))
-
-(defmacro markov-generator [name func]
-  `(defn ~name
-     ([param]
-      (~name param 1))
-     ([param n]
-      (generate-and-run-chain (~func param) n))))
+(def-markov-function generate-tweet tweets ;; User
+  :doc-string "[user] [user n]
+  Returns n tweets generated from the timeline of user.")
+(def-markov-function generate-reddit-comment get-reddit-comments ;; User
+  :doc-string "[user] [user n]
+  Returns n comments generated from the comments made by user.")
+(def-markov-function generate-reddit-post get-reddit-posts ;; Subreddit
+  :doc-string "[subreddit] [subreddit n]
+  Returns n posts generated from the posts of the subreddit.")
+(def-markov-function generate-reddit-title get-reddit-titles ;; Subreddit
+  :doc-string "[subreddit] [subreddit n]
+  Returns n titles generated from the titles of the subreddit.")
