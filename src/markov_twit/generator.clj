@@ -169,3 +169,10 @@
    (generate-reddit-title subreddit 1))
   ([subreddit n]
    (generate-and-run-chain (get-reddit-titles subreddit) n)))
+
+(defmacro markov-generator [name func]
+  `(defn ~name
+     ([param]
+      (~name param 1))
+     ([param n]
+      (generate-and-run-chain (~func param) n))))
