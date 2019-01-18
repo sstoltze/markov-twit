@@ -2,11 +2,11 @@
 (ns markov-twit.generator
   (:gen-class)
   (:require
-   [cheshire.core :as cheshire]
-   [clj-http.client :as client]
-   [environ.core :refer [env]]
-   [twitter.api.restful :as twitter]
-   [twitter.oauth :as twitter-oauth]))
+   [cheshire.core :as cheshire]        ;; JSON, used by clj-http
+   [clj-http.client :as client]        ;; HTTP
+   [environ.core :refer [env]]         ;; Twitter authentication
+   [twitter.api.restful :as twitter]   ;; Twitter interface
+   [twitter.oauth :as twitter-oauth])) ;; Twitter authentication
 
 (def http-header {"User-Agent" "markov-twit clj-http.client/3.9.1"})
 
@@ -76,8 +76,13 @@
         cleaned (clojure.string/replace strip-link #"[,| |:]$" ".")]
     (clojure.string/replace cleaned #"\"" "'")))
 
-(defn list->word-chain [list]
-  (apply merge-with clojure.set/union (map text->word-chain list)))
+(defn list->word-chain
+  ([list]
+   (list->word-chain list 2))
+  ([list chain-length]
+   (apply merge-with clojure.set/union (map text->word-chain
+                                            list
+                                            (repeat chain-length)))))
 
 (defn tweets [user]
   (->> (twitter/statuses-user-timeline :oauth-creds credentials
@@ -133,16 +138,20 @@
    (get-reddit-info subreddit :selftext :size n)))
 
 (defn generate-and-run-chain
+  ([input-list]
+   (generate-and-run-chain input-list 1))
   ([input-list n]
+   (generate-and-run-chain input-list n 2))
+  ([input-list n chain-length]
    (map (comp clean-text
               generate-text)
         ;; n copies of the generated chain
-        (repeat n (list->word-chain input-list))
+        (repeat n (list->word-chain input-list chain-length))
         ;; n starting phrases
         (take n
               (shuffle
                (map (fn [x]
-                      (take 2
+                      (take chain-length
                             (clojure.string/split x #" ")))
                     input-list))))))
 
@@ -152,37 +161,44 @@
   ([user n]
    (generate-and-run-chain (tweets user) n)))
 
-(defmacro def-markov-function [name function & {:keys [doc-string parameter-name count-name]}]
+(defmacro def-markov-function [name function & {:keys [doc-string parameter-name count-name chain-length-name]}]
   "name is the name of the function to be defined, function should accept a single parameter
 and return a list of texts used for generating the markov chain.
 
 Parameter-name and count-name allows naming of parameters to the generated function. If one of them is not supplied, a gensym is used instead."
-  (let [parameter-name (or parameter-name (gensym "parameter"))
-        count-name     (or count-name     (gensym "count"))]
+  (let [parameter-name (or parameter-name    (gensym "parameter"))
+        count-name     (or count-name        (gensym "count"))
+        chain-length   (or chain-length-name (gensym "chain-length"))]
     (concat `(defn ~name)
             (when doc-string `(~doc-string))
             `(([~parameter-name]
                (~name ~parameter-name 1))
               ([~parameter-name ~count-name]
-               (generate-and-run-chain (~function ~parameter-name) ~count-name))))))
+               (generate-and-run-chain (~function ~parameter-name) ~count-name))
+              ([~parameter-name ~count-name ~chain-length]
+               (generate-and-run-chain (~function ~parameter-name) ~count-name ~chain-length))))))
 
 (def-markov-function generate-tweet
   tweets
   :parameter-name user
   :count-name n
+  :chain-length-name chain-length
   :doc-string "Returns n tweets generated from the timeline of user.")
 (def-markov-function generate-reddit-comment
   get-reddit-comments
   :parameter-name user
   :count-name n
+  :chain-length-name chain-length
   :doc-string "Returns n comments generated from the comments made by user.")
 (def-markov-function generate-reddit-post
   get-reddit-posts
   :parameter-name subreddit
   :count-name n
+  :chain-length-name chain-length
   :doc-string "Returns n posts generated from the posts of the subreddit.")
 (def-markov-function generate-reddit-title
   get-reddit-titles
   :parameter-name subreddit
   :count-name n
+  :chain-length-name chain-length
   :doc-string "Returns n titles generated from the titles of the subreddit.")
