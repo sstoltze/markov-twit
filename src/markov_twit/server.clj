@@ -48,7 +48,8 @@
               (concat "<h2>Generated comments from "
                       reddit-user
                       "</h2>"
-                      reddit-comments)))))
+                      reddit-comments
+                      "<br>")))))
 
 (defn handle-query [request]
   (-> {:status 200
@@ -78,4 +79,4 @@
 
 (defn -main []
   (jetty/run-jetty web-app
-                   {:port 3019}))
+                   {:port 3020}))
