@@ -3,11 +3,14 @@
   :url "http://example.com/FIXME"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
             :url "https://www.eclipse.org/legal/epl-2.0/"}
+  :min-lein-version "2.8.3"
   :dependencies [[org.clojure/clojure "1.9.0"]
                  [twitter-api "1.8.0"]
                  [environ "1.1.0"]
                  [clj-http "3.9.1"]
-                 [cheshire "5.8.1"]]
+                 [cheshire "5.8.1"]
+                 [ring/ring-core "1.6.3"]
+                 [ring/ring-jetty-adapter "1.6.3"]]
   :plugins [[lein-environ "1.1.0"]]
   :main ^:skip-aot markov-twit.generator
   :target-path "target/%s"
