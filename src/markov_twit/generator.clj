@@ -62,12 +62,6 @@
                   start-phrase)]
      (word-list->text (walk-chain chain prefix prefix max-length)))))
 
-(defn file->word-chain
-  ([file-name]
-   (text->word-chain (slurp file-name)))
-  ([file-name chain-length]
-   (text->word-chain (slurp file-name) chain-length)))
-
 (defn clean-text [text]
   (let [trimmed (if (re-find #"[.,!?]" text)
                   (apply str (re-seq #"[\s\w]+[^.!?,]*[.!?,]" text)) ; Trim to last punctuation
@@ -83,6 +77,18 @@
    (apply merge-with clojure.set/union (map text->word-chain
                                             list
                                             (repeat chain-length)))))
+
+(defn file->word-chain
+  ([file-name]
+   (text->word-chain (slurp file-name)))
+  ([file-name chain-length]
+   (text->word-chain (slurp file-name) chain-length)))
+
+(defn get-files [file-names]
+  (apply concat (map (fn [f]
+                       ;; Split into paragraphs
+                       (clojure.string/split (slurp f) #"\n\n"))
+                     file-names)))
 
 (defn tweets [user]
   (->> (twitter/statuses-user-timeline :oauth-creds credentials
@@ -118,10 +124,7 @@
       (recur param key (- size n) user new-after (concat result children)))))
 
 (defn get-reddit-info
-  "Key-options:
-    For subreddit - :title, :selftext
-    For user - :body
-    For other options, consult the Reddit API."
+  ;; Key-options - :title, :selftext, :body (of a comment)
   ([param key & {:keys [size user after]}]
    (get-reddit-helper param key (or size 200) user after [])))
 
@@ -141,19 +144,21 @@
   ([input-list]
    (generate-and-run-chain input-list 1))
   ([input-list n]
-   (generate-and-run-chain input-list n 2))
-  ([input-list n chain-length]
+   (generate-and-run-chain input-list n 280))
+  ([input-list n max-length]
+   (generate-and-run-chain input-list n max-length 2))
+  ([input-list n max-length chain-length]
    (map (comp clean-text
               generate-text)
         ;; n copies of the generated chain
         (repeat n (list->word-chain input-list chain-length))
         ;; n starting phrases
-        (take n
-              (shuffle
-               (map (fn [x]
-                      (take chain-length
-                            (clojure.string/split x #" ")))
-                    input-list))))))
+        (take n (shuffle
+                 (map (fn [x]
+                        (take chain-length
+                              (clojure.string/split x #" ")))
+                      input-list)))
+        (repeat n max-length))))
 
 (defn generate-tweet-orig
   ([user]
@@ -161,44 +166,59 @@
   ([user n]
    (generate-and-run-chain (tweets user) n)))
 
-(defmacro def-markov-function [name function & {:keys [doc-string parameter-name count-name chain-length-name]}]
-  "name is the name of the function to be defined, function should accept a single parameter
-and return a list of texts used for generating the markov chain.
+(defmacro def-markov-function [name function & {:keys [doc-string parameter-name count-name max-length-name chain-length-name]}]
+  "Defines a function called 'name' that takes a parameter and walks a markov chain generated from the result of the supplied 'function' called with that parameter.
 
-Parameter-name and count-name allows naming of parameters to the generated function. If one of them is not supplied, a gensym is used instead."
-  (let [parameter-name (or parameter-name    (gensym "parameter"))
-        count-name     (or count-name        (gensym "count"))
-        chain-length   (or chain-length-name (gensym "chain-length"))]
+The 'function' should accept a single parameter and return a list of texts used for generating the markov chain.
+
+The keys *-name allows naming of parameters to the generated function, for better documentation. If one is not supplied, a gensym is used instead."
+  (let [parameter    (or parameter-name    (gensym "parameter"))
+        count        (or count-name        (gensym "count"))
+        max-length   (or max-length-name   (gensym "max-length"))
+        chain-length (or chain-length-name (gensym "chain-length"))]
     (concat `(defn ~name)
             (when doc-string `(~doc-string))
-            `(([~parameter-name]
-               (~name ~parameter-name 1))
-              ([~parameter-name ~count-name]
-               (generate-and-run-chain (~function ~parameter-name) ~count-name))
-              ([~parameter-name ~count-name ~chain-length]
-               (generate-and-run-chain (~function ~parameter-name) ~count-name ~chain-length))))))
+            `(([~parameter]
+               (~name ~parameter 1))
+              ([~parameter ~count]
+               (generate-and-run-chain (~function ~parameter) ~count))
+              ([~parameter ~count ~max-length]
+               (generate-and-run-chain (~function ~parameter) ~count ~max-length))
+              ([~parameter ~count ~max-length ~chain-length]
+               (generate-and-run-chain (~function ~parameter) ~count ~max-length ~chain-length))))))
 
 (def-markov-function generate-tweet
   tweets
+  :doc-string "Returns n tweets generated from the timeline of user."
   :parameter-name user
   :count-name n
-  :chain-length-name chain-length
-  :doc-string "Returns n tweets generated from the timeline of user.")
+  :max-length-name max-length
+  :chain-length-name chain-length)
 (def-markov-function generate-reddit-comment
   get-reddit-comments
+  :doc-string "Returns n comments generated from the comments made by user."
   :parameter-name user
   :count-name n
-  :chain-length-name chain-length
-  :doc-string "Returns n comments generated from the comments made by user.")
+  :max-length-name max-length
+  :chain-length-name chain-length)
 (def-markov-function generate-reddit-post
   get-reddit-posts
+  :doc-string "Returns n posts generated from the posts of the subreddit."
   :parameter-name subreddit
   :count-name n
-  :chain-length-name chain-length
-  :doc-string "Returns n posts generated from the posts of the subreddit.")
+  :max-length-name max-length
+  :chain-length-name chain-length)
 (def-markov-function generate-reddit-title
   get-reddit-titles
+  :doc-string "Returns n titles generated from the titles of the subreddit."
   :parameter-name subreddit
   :count-name n
-  :chain-length-name chain-length
-  :doc-string "Returns n titles generated from the titles of the subreddit.")
+  :max-length-name max-length
+  :chain-length-name chain-length)
+(def-markov-function generate-file
+  get-files
+  :doc-string "Generates a text based on the contents of the files in file-list."
+  :parameter-name file-list
+  :count-name n
+  :max-length-name max-length
+  :chain-length-name chain-length)
