@@ -3,7 +3,7 @@
   :url "https://github.com/sstoltze/markov-twit"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
             :url "https://www.eclipse.org/legal/epl-2.0/"}
-  :min-lein-version "2.8.3"
+  :min-lein-version "2.7.1"
   :dependencies [[cheshire "5.8.1"]
                  [clj-http "3.9.1"]
                  [environ "1.1.0"]
