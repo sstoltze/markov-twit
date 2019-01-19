@@ -63,11 +63,10 @@
      (word-list->text (walk-chain chain prefix prefix max-length)))))
 
 (defn clean-text [text]
-  (let [trimmed (if (re-find #"[.,!?]" text)
-                  (apply str (re-seq #"[\s\w]+[^.!?,]*[.!?,]" text)) ; Trim to last punctuation
-                  (apply str (re-seq #".*[^a-zA-Z]+" text)))         ; Trim last word
-        strip-link (clojure.string/replace trimmed #" https://.*\.$" "")
-        cleaned (clojure.string/replace strip-link #"[,| |:]$" ".")]
+  (let [trimmed (apply str (re-seq #".*[^a-zA-Z]+" text)) ; Trim last word
+        ;; trimmed (apply str (re-seq #"[\s\w]+[^.!?,]*[.!?,]" text)) ; Trim to last punctuation
+        ;; strip-link (clojure.string/replace trimmed #"https://.*$" "")
+        cleaned (clojure.string/replace trimmed #"[,| |:]$" ".")]
     (clojure.string/replace cleaned #"\"" "'")))
 
 (defn list->word-chain

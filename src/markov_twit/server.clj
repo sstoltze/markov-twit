@@ -12,11 +12,13 @@
         reddit-user  (:reddit-user  params)
         subreddit    (:subreddit    params)
         twitter-user (:twitter-user params)
+        chain-length (Integer. (or (:chain params)
+                                   "2"))
         tweets       (if (not-empty twitter-user)
                        (try
                          (reduce concat
                                  (map (fn [tweet] (concat "<p>" tweet "</p>"))
-                                      (generator/generate-tweet twitter-user 5)))
+                                      (generator/generate-tweet twitter-user 5 280 chain-length)))
                          (catch Exception e
                            ""))
                        "")
@@ -24,9 +26,9 @@
                        (try
                          (reduce concat (map concat
                                              (repeat 5 "<p><h3>")
-                                             (generator/generate-reddit-title subreddit 5 350)
+                                             (generator/generate-reddit-title subreddit 5 350 chain-length)
                                              (repeat 5 "</h3>")
-                                             (generator/generate-reddit-post  subreddit 5 600)
+                                             (generator/generate-reddit-post  subreddit 5 600 chain-length)
                                              (repeat 5 "</p>")))
                          (catch Exception e
                            ""))
@@ -35,7 +37,7 @@
                           (try
                             (reduce concat
                                     (map (fn [comment] (concat "<p>" comment "</p>"))
-                                         (generator/generate-reddit-comment reddit-user 5 500)))
+                                         (generator/generate-reddit-comment reddit-user 5 500 chain-length)))
                             (catch Exception e
                               ""))
                           "")]
