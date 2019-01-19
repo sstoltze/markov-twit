@@ -95,4 +95,5 @@
 
 (defn -main []
   (jetty/run-jetty web-app
-                   {:port 3000}))
+                   {:port (Integer. (or (System/getenv "PORT")
+                                        "3000"))}))
