@@ -84,7 +84,8 @@
          "/"           (static-file "index.html")
          "/index.html" (static-file "index.html")
          ;; Query handling
-         "/query"      (handle-query request))
+         "/query"      (handle-query request)
+         "")
        (response/content-type "text/html;charset=UTF-8"))))
 
 (def web-app
