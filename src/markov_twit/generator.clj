@@ -95,9 +95,7 @@
                                        ;; Max 200 tweets returned by Twitter api
                                        :params {:screen-name user :count 200})
        :body
-       (map :text)
-       ;; (map clojure.string/lower-case)
-       ))
+       (map :text)))
 
 (defn- get-reddit-helper [param key size user after result]
   (let [url (str "https://reddit.com/"
@@ -181,9 +179,9 @@ The keys *-name allows naming of parameters to the generated function, for bette
             `(([~parameter]
                (~name ~parameter 1))
               ([~parameter ~count]
-               (generate-and-run-chain (~function ~parameter) ~count))
+               (~name ~parameter ~count 280))
               ([~parameter ~count ~max-length]
-               (generate-and-run-chain (~function ~parameter) ~count ~max-length))
+               (~name ~parameter ~count ~max-length 2))
               ([~parameter ~count ~max-length ~chain-length]
                (generate-and-run-chain (~function ~parameter) ~count ~max-length ~chain-length))))))
 
