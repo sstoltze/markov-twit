@@ -7,67 +7,71 @@
    [ring.middleware.keyword-params :as keyword-params]
    [markov-twit.generator :as generator]))
 
+(defn parse-twitter [twitter-user chain-length]
+  (if (not-empty twitter-user)
+    (try
+      (reduce concat
+              (map (fn [tweet] (concat "<p>" tweet "</p>"))
+                   (generator/generate-tweet twitter-user 5 280 chain-length)))
+      (catch Exception e
+        ""))
+    ""))
+
+(defn parse-reddit-posts [subreddit chain-length]
+  (if (not-empty subreddit)
+    (try
+      (reduce concat (map concat
+                          (repeat 5 "<p><h3>")
+                          (generator/generate-reddit-title subreddit 5 350 chain-length)
+                          (repeat 5 "</h3>")
+                          (generator/generate-reddit-post  subreddit 5 600 chain-length)
+                          (repeat 5 "</p>")))
+      (catch Exception e
+        ""))
+    ""))
+
+(defn parse-reddit-comments [reddit-user chain-length]
+  (if (not-empty reddit-user)
+    (try
+      (reduce concat
+              (map (fn [comment] (concat "<p>" comment "</p>"))
+                   (generator/generate-reddit-comment reddit-user 5 500 chain-length)))
+      (catch Exception e
+        ""))
+    ""))
+
+(defn format-generated [from generated name-of-generated]
+  (if (seq generated)
+    (concat "<h2>Generated " name-of-generated " from "
+            from
+            "</h2>"
+            generated
+            "<br>")
+    (concat "<h2>Could not find " from "</h2>")))
+
 (defn parse-query-string [request]
-  (let [params       (:params request)
+  (let [params       (:params       request)
         reddit-user  (:reddit-user  params)
         subreddit    (:subreddit    params)
         twitter-user (:twitter-user params)
         chain-length (Integer. (or (:chain params)
-                                   "2"))
-        tweets       (if (not-empty twitter-user)
-                       (try
-                         (reduce concat
-                                 (map (fn [tweet] (concat "<p>" tweet "</p>"))
-                                      (generator/generate-tweet twitter-user 5 280 chain-length)))
-                         (catch Exception e
-                           ""))
-                       "")
-        reddit-posts (if (not-empty subreddit)
-                       (try
-                         (reduce concat (map concat
-                                             (repeat 5 "<p><h3>")
-                                             (generator/generate-reddit-title subreddit 5 350 chain-length)
-                                             (repeat 5 "</h3>")
-                                             (generator/generate-reddit-post  subreddit 5 600 chain-length)
-                                             (repeat 5 "</p>")))
-                         (catch Exception e
-                           ""))
-                       "")
-        reddit-comments (if (not-empty reddit-user)
-                          (try
-                            (reduce concat
-                                    (map (fn [comment] (concat "<p>" comment "</p>"))
-                                         (generator/generate-reddit-comment reddit-user 5 500 chain-length)))
-                            (catch Exception e
-                              ""))
-                          "")]
+                                   "2"))]
     (concat
      (if (not-empty twitter-user)
-       (if (seq tweets)
-         (concat "<h2>Generated tweets from @"
-                 twitter-user
-                 "</h2>"
-                 tweets
-                 "<br>")
-         (concat "<h2>Could not find twitter user @" twitter-user "</h2>"))
+       (format-generated (concat "@" twitter-user)
+                         (parse-twitter twitter-user chain-length)
+                         "tweets")
        "")
      (if (not-empty subreddit)
-       (if (seq reddit-posts)
-         (concat "<h2>Generated posts from subreddit "
-                 subreddit
-                 "</h2>"
-                 reddit-posts
-                 "<br>")
-         (concat "<h2>Could not find subreddit " subreddit "</h2>"))
+       (format-generated (concat "/r/" subreddit)
+                         (parse-reddit-posts subreddit chain-length)
+                         "posts")
        "")
      (if (not-empty reddit-user)
-       (if (seq reddit-comments)
-         (concat "<h2>Generated comments from reddit user "
-                 reddit-user
-                 "</h2>"
-                 reddit-comments
-                 "<br>")
-         (concat "<h2>Could not find reddit user " reddit-user "</h2>"))))))
+       (format-generated (concat "/u/" reddit-user)
+                         (parse-reddit-comments reddit-user chain-length)
+                         "comments")
+       ""))))
 
 (defn handle-query [request]
   (-> {:status 200
